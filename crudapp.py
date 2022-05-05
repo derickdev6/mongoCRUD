@@ -1,29 +1,36 @@
-import sqlite3
+import pymongo
 import tkinter as tk
 from tkinter import *
 
 
-def searchHandler(request):
-    # Connects to DB
-    sqliteConnection = sqlite3.connect('hwood.db')
-    cursor = sqliteConnection.cursor()
-    # Print statement and execution
-    print("-----------------------------Executing search on hwood.db\n" + request)
+def searchHandler(type):
     try:
-        cursor.execute(request)
+        # Connecting to server
+        CONNECTION_STRING = "mongodb://localhost:27017"
+        client = pymongo.MongoClient(CONNECTION_STRING)
+
+        # Selecting db
+        mydb = client['MoviesDB']
+
+        # Selecting collection
+        col = mydb['Movies']
+
+        if type == 'all':
+            records = list(col.find())
+        if type == 'year':
+            records = list(col.find().sort("Estreno", -1))
+        if type == 'director':
+            records = list(col.find())
+
+        # print(f"Items = {len(records)}")
+        # for row in records:
+            # print(row)
+        return records
+
     except Exception as e:
-        print("Error executing searchHandler")
-    records = cursor.fetchall()
-    if len(records) != 0:
-        print("Records found: " + str(len(records)))
-    else:
-        print("No records found")
-    cursor.close()
-    if sqliteConnection:
-        sqliteConnection.close()
-        print("-----------------------------DB Disconnected")
-    # Returning results (can be empty array)
-    return records
+        print("Database not created and Failed to Connect")
+    finally:
+        print("Program ended successfully")
 
 
 def modifyHandler(request):
@@ -166,7 +173,7 @@ def RGUI():
             lista[6].destroy()
         # Creating a Listbox and
         # attaching it to root window
-        listbox = Listbox(root, width=120, height=40)
+        listbox = Listbox(root, width=60, height=40)
 
         # Adding Listbox to the left
         # side of root window
@@ -181,16 +188,22 @@ def RGUI():
         scrollbar.grid(row=2, column=3, sticky="ns", rowspan=5)
 
         # Fetch results from DB
-        results = searchHandler("""SELECT *FROM Movies m """)
+        results = searchHandler("all")
 
         # Insert elements into the listbox
-        line = "  ", "Id", " " * (4-2), "Title", " " * (42-5), "Character", " " * (
-            32-9), "Premiere", " " * (15-8), "Director"
-        listbox.insert(END, "".join(line))
-        for values in results:
-            line = "  ", str(values[0]), " " * (4-len(str(values[0]))), values[1], " " * (42-len(str(values[1]))), values[2], " " * (
-                32-len(str(values[2]))), values[3], " " * (15-len(str(values[3]))), values[4]
-            listbox.insert(END, "".join(line))
+        # for doc in results:
+        #     item = f"'id': {doc['Id']}, \n'Title': {doc['Titulo']}, \n\n\n'Character': {doc['Personaje']}, \n'Premier': {doc['Estreno']}, \n'Director': {doc['Director']}"
+        #     listbox.insert(END, item)
+        for doc in results:
+            data = [['Id', doc['Id']], ['Titulo', doc['Titulo']], ['Personaje', doc['Personaje']], [
+                'Estreno', doc['Estreno']], ['Director', doc['Director']]]
+            # print(data)
+            listbox.insert(END, " {")
+
+            for value in data:
+                listbox.insert(END, f"{' '*5}'{value[0]}': '{value[1]}'")
+
+            listbox.insert(END, " }")
 
         # Attaching Listbox to Scrollbar
         # Since we need to have a vertical
@@ -228,19 +241,13 @@ def RGUI():
         scrollbar.grid(row=2, column=3, sticky="ns", rowspan=10)
 
         # Fetch results from DB
-        results = searchHandler("""SELECT COUNT(Id) as cantidad,strftime('%Y', Premiere) as dat
-FROM Movies m
-GROUP BY dat
-ORDER BY cantidad desc""")
+        # Fetch results from DB
+        results = searchHandler("year")
 
         # Insert elements into the listbox
-        line = "  ", "Movies", " " * (10-6), "Year",
-        listbox.insert(END, "".join(line))
-
-        for values in results:
-            line = "  ", str(values[0]), " " * (10-len(str(values[0]))
-                                                ), values[1]
-            listbox.insert(END, "".join(line))
+        for doc in results:
+            item = f"'name': {doc['name']}, \n'age': {doc['age']}"
+            listbox.insert(END, "".join(item))
 
         # Attaching Listbox to Scrollbar
         # Since we need to have a vertical
@@ -277,19 +284,12 @@ ORDER BY cantidad desc""")
         scrollbar.grid(row=2, column=3, sticky="ns", rowspan=5)
 
         # Fetch results from DB
-        results = searchHandler("""SELECT COUNT(Id) as cantidad, Director
-FROM Movies m
-GROUP BY Director
-ORDER BY cantidad desc""")
+        results = searchHandler("director")
 
         # Insert elements into the listbox
-        line = "  ", "Movies", " " * (10-6), "Director",
-        listbox.insert(END, "".join(line))
-
-        for values in results:
-            line = "  ", str(values[0]), " " * (10-len(str(values[0]))
-                                                ), values[1]
-            listbox.insert(END, "".join(line))
+        for doc in results:
+            item = f"'name': {doc['name']}, \n'age': {doc['age']}"
+            listbox.insert(END, "".join(item))
 
         # Attaching Listbox to Scrollbar
         # Since we need to have a vertical
@@ -402,7 +402,7 @@ def UGUI():
         # Updates row(s) and updates checker color if error is found
         # Else goes back to Update view
         def updateMovie():
-            req = f"""UPDATE Movies 
+            req = f"""UPDATE Movies
 SET Title = '{ent_title.get()}',
 "Character" = '{ent_character.get()}',
 Premiere = '{ent_premiere.get()}',
@@ -435,7 +435,7 @@ def DGUI():
     ent_id.grid(column=1, row=2, padx=10, sticky="w")
 
     btn_delId = tk.Button(text="Delete by Id", command=lambda: [
-                          deleteMovie("Id", ent_id.get()), ent_id.delete(0, END)])
+        deleteMovie("Id", ent_id.get()), ent_id.delete(0, END)])
     btn_delId.grid(column=0, row=3, columnspan=2)
 
     lbl_title = tk.Label(text="Title", height=2, width=10)
@@ -445,7 +445,7 @@ def DGUI():
 
     # Delete button throws deleteMovie function and clears entries
     btn_delTitle = tk.Button(text="Delete by Title", command=lambda: [
-                             deleteMovie("Title", ent_title.get()), ent_title.delete(0, END)])
+        deleteMovie("Title", ent_title.get()), ent_title.delete(0, END)])
     btn_delTitle.grid(column=0, row=5, columnspan=2)
 
     # Executes req and updates checker color
