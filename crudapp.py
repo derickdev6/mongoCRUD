@@ -1,3 +1,4 @@
+from datetime import date
 import pymongo
 import tkinter as tk
 from tkinter import *
@@ -17,15 +18,41 @@ def searchHandler(type):
 
         if type == 'all':
             records = list(col.find())
-        if type == 'year':
-            records = list(col.find().sort("Estreno", -1))
+            return records
         if type == 'director':
-            records = list(col.find())
+            agg_result = col.aggregate(
+                [{
+                    "$group":
+                    {"_id": "$Director",
+                     "numPelis": {"$sum": 1}
+                     },
+                },
+                    {
+                    "$sort": {"numPelis": -1}
+                }
+                ])
+            # for i in agg_result:
+            # print(i)
+            return agg_result
+        if type == 'year':
+            agg_result = col.aggregate([
+                {
+                    "$group": {
+                        "_id": {"$year": "$Premiere"},
+                        "numPelis": {"$sum": 1},
+                    }
+                },
+                {
+                    "$sort": {"numPelis": -1}
+                }
+            ])
+            # for i in agg_result:
+            #     print(i)
+            return agg_result
 
         # print(f"Items = {len(records)}")
         # for row in records:
             # print(row)
-        return records
 
     except Exception as e:
         print("Database not created and Failed to Connect")
@@ -33,28 +60,26 @@ def searchHandler(type):
         print("Program ended successfully")
 
 
-def modifyHandler(request):
-    # Connects to DB
-    sqliteConnection = sqlite3.connect('hwood.db')
-    cursor = sqliteConnection.cursor()
-    # Print statement and execution
-    print("-----------------------------Executing " +
-          request.split()[0] + " on hwood.db\n" + request)
+def modifyHandler(newDocument):
     try:
-        cursor.execute(request)
+        # Connecting to server
+        CONNECTION_STRING = "mongodb://localhost:27017"
+        client = pymongo.MongoClient(CONNECTION_STRING)
+
+        # Selecting db
+        mydb = client['MoviesDB']
+
+        # Selecting collection
+        col = mydb['Movies']
+
+        print(newDocument)
+
+        col.insert_one(newDocument)
+
     except Exception as e:
-        print("Error executing modifyHandler")
-    sqliteConnection.commit()
-    if (cursor.rowcount > 0):
-        print("Record inserted/deleted/updated successfully ", cursor.rowcount)
-    else:
-        print("Record NOT inserted/deleted/updated")
-    cursor.close()
-    if sqliteConnection:
-        sqliteConnection.close()
-        print("-----------------------------DB Disconnected")
-    # Returns boolean indicating success or failure
-    return cursor.rowcount > 0
+        print("Database not created and Failed to Connect" + e)
+    finally:
+        print("Program ended successfully")
 
 
 def main():
@@ -130,9 +155,10 @@ def CGUI():
 
     # New movie function, checker color updated
     def newMovie():
-        req = f"""INSERT INTO Movies (Id, Title, \"Character\", Premiere, Director)
-VALUES ({ent_id.get()}, '{ent_title.get()}', '{ent_character.get()}', '{ent_premiere.get()}', '{ent_director.get()}')"""
-        if (modifyHandler(req)):
+        newDocument = {"Id": int(ent_id.get()), "Title": ent_title.get(
+        ), "Character": ent_character.get(), "Premiere": ent_premiere.get(), "Director": ent_director.get()}
+
+        if (modifyHandler(newDocument)):
             lbl_checker.configure(fg="green")
         else:
             lbl_checker.configure(fg="red")
@@ -192,11 +218,11 @@ def RGUI():
 
         # Insert elements into the listbox
         # for doc in results:
-        #     item = f"'id': {doc['Id']}, \n'Title': {doc['Titulo']}, \n\n\n'Character': {doc['Personaje']}, \n'Premier': {doc['Estreno']}, \n'Director': {doc['Director']}"
+        #     item = f"'id': {doc['Id']}, \n'Title': {doc['Title']}, \n\n\n'Character': {doc['Character']}, \n'Premier': {doc['Premiere']}, \n'Director': {doc['Director']}"
         #     listbox.insert(END, item)
         for doc in results:
-            data = [['Id', doc['Id']], ['Titulo', doc['Titulo']], ['Personaje', doc['Personaje']], [
-                'Estreno', doc['Estreno']], ['Director', doc['Director']]]
+            data = [['Id', doc['Id']], ['Title', doc['Title']], ['Character', doc['Character']], [
+                'Premiere', doc['Premiere']], ['Director', doc['Director']]]
             # print(data)
             listbox.insert(END, " {")
 
@@ -225,7 +251,7 @@ def RGUI():
             lista[6].destroy()
         # Creating a Listbox and
         # attaching it to root window
-        listbox = Listbox(root, width=30, height=20)
+        listbox = Listbox(root, width=60, height=40)
 
         # Adding Listbox to the left
         # side of root window
@@ -246,8 +272,14 @@ def RGUI():
 
         # Insert elements into the listbox
         for doc in results:
-            item = f"'name': {doc['name']}, \n'age': {doc['age']}"
-            listbox.insert(END, "".join(item))
+            data = [['Premiere', doc['_id']], ['Peliculas', doc['numPelis']]]
+            # print(data)
+            listbox.insert(END, " {")
+
+            for value in data:
+                listbox.insert(END, f"{' '*5}'{value[0]}': '{value[1]}'")
+
+            listbox.insert(END, " }")
 
         # Attaching Listbox to Scrollbar
         # Since we need to have a vertical
@@ -269,7 +301,7 @@ def RGUI():
             lista[6].destroy()
         # Creating a Listbox and
         # attaching it to root window
-        listbox = Listbox(root, width=40, height=20)
+        listbox = Listbox(root, width=60, height=40)
 
         # Adding Listbox to the left
         # side of root window
@@ -288,8 +320,14 @@ def RGUI():
 
         # Insert elements into the listbox
         for doc in results:
-            item = f"'name': {doc['name']}, \n'age': {doc['age']}"
-            listbox.insert(END, "".join(item))
+            data = [['Director', doc['_id']], ['Peliculas', doc['numPelis']]]
+            # print(data)
+            listbox.insert(END, " {")
+
+            for value in data:
+                listbox.insert(END, f"{' '*5}'{value[0]}': '{value[1]}'")
+
+            listbox.insert(END, " }")
 
         # Attaching Listbox to Scrollbar
         # Since we need to have a vertical
