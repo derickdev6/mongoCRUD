@@ -541,6 +541,6 @@ def DGUI():
 
 
 if __name__ == '__main__':
-    root = tk.Tk(className='Sqlite CRUD')
+    root = tk.Tk(className='Mongo CRUD')
     main()
     root.mainloop()
