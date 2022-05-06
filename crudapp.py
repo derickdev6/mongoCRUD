@@ -1,10 +1,10 @@
-from datetime import date
+import datetime
 import pymongo
 import tkinter as tk
 from tkinter import *
 
 
-def searchHandler(type):
+def searchHandler(type, data='none'):
     try:
         # Connecting to server
         CONNECTION_STRING = "mongodb://localhost:27017"
@@ -49,18 +49,22 @@ def searchHandler(type):
             # for i in agg_result:
             #     print(i)
             return agg_result
-
-        # print(f"Items = {len(records)}")
-        # for row in records:
-            # print(row)
+        if type == 'one-id':
+            records = col.find_one({'Id': data})
+            # print(records)
+            return records
+        if type == 'one-title':
+            records = col.find_one({'Title': data})
+            # print(records)
+            return records
 
     except Exception as e:
         print("Database not created and Failed to Connect")
     finally:
-        print("Program ended successfully")
+        print("Program executed successfully")
 
 
-def modifyHandler(newDocument):
+def modifyHandler(type, data, check=""):
     try:
         # Connecting to server
         CONNECTION_STRING = "mongodb://localhost:27017"
@@ -72,14 +76,36 @@ def modifyHandler(newDocument):
         # Selecting collection
         col = mydb['Movies']
 
-        print(newDocument)
+        # print("Data = " + str(data))
 
-        col.insert_one(newDocument)
+        if (type == 'insert'):
+            r = col.insert_one(data)
+            return r
+        if (type == 'update'):
+            pass
+        if (type == 'delete-id'):
+            r = col.delete_many({'Id': data})
+            if r.deleted_count > 0:
+                return True
+            else:
+                return False
+        if (type == 'delete-title'):
+            r = col.delete_many({'Title': data})
+            if r.deleted_count > 0:
+                return True
+            else:
+                return False
+        if(type == 'update-id'):
+            r = col.update_many({'Id': check}, {'$set': data})
+            return r
+        if(type == 'update-title'):
+            r = col.update_many({'Title': check}, {'$set': data})
+            return r
 
     except Exception as e:
         print("Database not created and Failed to Connect" + e)
     finally:
-        print("Program ended successfully")
+        print("Program executed successfully")
 
 
 def main():
@@ -155,10 +181,12 @@ def CGUI():
 
     # New movie function, checker color updated
     def newMovie():
+        d = datetime.datetime.strptime(
+            ent_premiere.get(), "%Y-%m-%d")
         newDocument = {"Id": int(ent_id.get()), "Title": ent_title.get(
-        ), "Character": ent_character.get(), "Premiere": ent_premiere.get(), "Director": ent_director.get()}
+        ), "Character": ent_character.get(), "Premiere": d, "Director": ent_director.get()}
 
-        if (modifyHandler(newDocument)):
+        if (modifyHandler("insert", newDocument)):
             lbl_checker.configure(fg="green")
         else:
             lbl_checker.configure(fg="red")
@@ -362,7 +390,7 @@ def UGUI():
     ent_id.grid(column=1, row=2, padx=10, sticky="w")
 
     btn_create = tk.Button(text="Select by Id",
-                           command=lambda: verify("Id", ent_id.get()))
+                           command=lambda: verify("Id"))
     btn_create.grid(column=0, row=3, columnspan=2)
 
     lbl_title = tk.Label(text="Title", height=2, width=10)
@@ -371,21 +399,29 @@ def UGUI():
     ent_title.grid(column=1, row=4, padx=10, sticky="w")
 
     btn_create = tk.Button(text="Select by Title",
-                           command=lambda: verify("Title", ent_title.get()))
+                           command=lambda: verify("Title"))
     btn_create.grid(column=0, row=5, columnspan=2)
 
     # verify function, searches for row with Id or Title
     # runs update function if exists
     # else clears entries and updates checker color
-    def verify(type, check):
-        search = searchHandler(
-            f"""Select * FROM Movies WHERE {type} = '{check}'""")
-        if (len(search) != 0):
-            update(search[0], type, check)
-        else:
-            ent_title.delete(0, END)
-            ent_id.delete(0, END)
-            lbl_checker.configure(fg="red")
+    def verify(type):
+        if type == "Title":
+            search = searchHandler('one-title', ent_title.get())
+            if (len(search) > 0):
+                lbl_checker.configure(fg="green")
+                update(search, type, ent_title.get())
+            else:
+                ent_title.delete(0, END)
+                lbl_checker.configure(fg="red")
+        if type == "Id":
+            search = searchHandler('one-id', int(ent_id.get()))
+            if (len(search) > 0):
+                lbl_checker.configure(fg="green")
+                update(search, type, int(ent_id.get()))
+            else:
+                ent_id.delete(0, END)
+                lbl_checker.configure(fg="red")
 
     # Creates new window
     def update(search, type, check):
@@ -405,31 +441,31 @@ def UGUI():
 
         lbl_id = tk.Label(text="Id", height=2, width=10)
         lbl_id.grid(column=0, row=2, padx=10)
-        lbl_idHolder = tk.Label(text=search[0], height=2)
+        lbl_idHolder = tk.Label(text=search['Id'], height=2)
         lbl_idHolder.grid(column=1, row=2, padx=10, sticky="w")
 
         lbl_title = tk.Label(text="Title", height=2, width=10)
         lbl_title.grid(column=0, row=3, padx=10)
         ent_title = tk.Entry()
-        ent_title.insert(END, search[1])
+        ent_title.insert(END, search['Title'])
         ent_title.grid(column=1, row=3, padx=10, sticky="w")
 
         lbl_character = tk.Label(text="Character", height=2, width=10)
         lbl_character.grid(column=0, row=4)
         ent_character = tk.Entry()
-        ent_character.insert(END, search[2])
+        ent_character.insert(END, search['Character'])
         ent_character.grid(column=1, row=4, padx=10, sticky="w")
 
         lbl_premiere = tk.Label(text="Premiere", height=2, width=10)
         lbl_premiere.grid(column=0, row=5)
         ent_premiere = tk.Entry()
-        ent_premiere.insert(END, search[3])
+        ent_premiere.insert(END, str(search['Premiere'])[:10])
         ent_premiere.grid(column=1, row=5, padx=10, sticky="w")
 
         lbl_director = tk.Label(text="Director", height=2, width=10)
         lbl_director.grid(column=0, row=6)
         ent_director = tk.Entry()
-        ent_director.insert(END, search[4])
+        ent_director.insert(END, search['Director'])
         ent_director.grid(column=1, row=6, padx=10, sticky="w")
 
         # Update button, throws updateMovie function
@@ -440,16 +476,19 @@ def UGUI():
         # Updates row(s) and updates checker color if error is found
         # Else goes back to Update view
         def updateMovie():
-            req = f"""UPDATE Movies
-SET Title = '{ent_title.get()}',
-"Character" = '{ent_character.get()}',
-Premiere = '{ent_premiere.get()}',
-Director = '{ent_director.get()}'
-WHERE {type} = '{check}'"""
-            if (modifyHandler(req)):
-                UGUI()
-            else:
-                lbl_checker.configure(fg="red")
+            d = datetime.datetime.strptime(ent_premiere.get(), "%Y-%m-%d")
+            newDocument = {"Id": search['Id'], "Title": ent_title.get(
+            ), "Character": ent_character.get(), "Premiere": d, "Director": ent_director.get()}
+            if (type == "Title"):
+                if (modifyHandler("update-title", newDocument, check)):
+                    UGUI()
+                else:
+                    lbl_checker.configure(fg="red")
+            if (type == "Id"):
+                if (modifyHandler("update-id", newDocument, check)):
+                    UGUI()
+                else:
+                    lbl_checker.configure(fg="red")
 
 
 def DGUI():
@@ -458,7 +497,8 @@ def DGUI():
         widget.destroy()
 
     # Labels entries and buttons
-    btn_back = tk.Button(text="<", height=1, width=1, command=lambda: main())
+    btn_back = tk.Button(text="<", height=1, width=1,
+                         command=lambda: main())
     btn_back.grid(column=0, row=0)
 
     lbl_title = tk.Label(text="Delete Movie", height=4, width=30)
@@ -473,7 +513,7 @@ def DGUI():
     ent_id.grid(column=1, row=2, padx=10, sticky="w")
 
     btn_delId = tk.Button(text="Delete by Id", command=lambda: [
-        deleteMovie("Id", ent_id.get()), ent_id.delete(0, END)])
+        deleteMovie("Id"), ent_id.delete(0, END)])
     btn_delId.grid(column=0, row=3, columnspan=2)
 
     lbl_title = tk.Label(text="Title", height=2, width=10)
@@ -483,16 +523,21 @@ def DGUI():
 
     # Delete button throws deleteMovie function and clears entries
     btn_delTitle = tk.Button(text="Delete by Title", command=lambda: [
-        deleteMovie("Title", ent_title.get()), ent_title.delete(0, END)])
+        deleteMovie("Title"), ent_title.delete(0, END)])
     btn_delTitle.grid(column=0, row=5, columnspan=2)
 
     # Executes req and updates checker color
-    def deleteMovie(type, check):
-        req = f"""DELETE FROM Movies WHERE {type} = '{check}'"""
-        if (modifyHandler(req)):
-            lbl_checker.configure(fg="green")
-        else:
-            lbl_checker.configure(fg="red")
+    def deleteMovie(type):
+        if type == "Title":
+            if (modifyHandler('delete-title', ent_title.get())):
+                lbl_checker.configure(fg="green")
+            else:
+                lbl_checker.configure(fg="red")
+        if type == "Id":
+            if (modifyHandler('delete-id', int(ent_id.get()))):
+                lbl_checker.configure(fg="green")
+            else:
+                lbl_checker.configure(fg="red")
 
 
 if __name__ == '__main__':
